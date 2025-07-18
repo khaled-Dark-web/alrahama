@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام إدارة حضور الطلاب (React)</title>
+    
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <!-- React and Babel for in-browser JSX transformation -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- QR Code Scanner Library -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+    <!-- Custom Styles -->
+    <style>
+        :root {
+            --primary-color: #0d9488; /* teal-600 */
+            --primary-hover: #0f766e; /* teal-700 */
+            --primary-light: #ccfbf1; /* teal-100 */
+            --secondary-color: #a1a1aa; /* zinc-400 */
+            --secondary-hover: #71717a; /* zinc-500 */
+            --danger-color: #dc2626; /* red-600 */
+            --danger-hover: #b91c1c; /* red-700 */
+            --warning-color: #f59e0b; /* amber-500 */
+            --warning-hover: #d97706; /* amber-600 */
+            --background-color: #f8fafc; /* slate-50 */
+            --card-background: #ffffff;
+            --text-primary: #18181b; /* zinc-900 */
+            --text-secondary: #52525b; /* zinc-600 */
+            --border-color: #e4e4e7; /* zinc-200 */
+        }
+        body { font-family: 'Tajawal', 'Inter', sans-serif; background-color: var(--background-color); color: var(--text-primary); }
+        .main-nav-button { 
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.5rem;
+            transition: all 0.2s ease-in-out; 
+            border: 1px solid transparent;
+            background-color: transparent;
+            color: var(--text-secondary);
+            flex-shrink: 0;
+        }
+        .main-nav-button:hover { background-color: #f1f5f9; /* slate-100 */ color: var(--text-primary); }
+        .main-nav-button.active { background-color: var(--primary-light); color: var(--primary-color); font-weight: 700; }
+        .main-nav-button.disabled { color: #9ca3af; cursor: not-allowed; }
+        .main-nav-button.disabled:hover { background-color: transparent; }
+
+        .form-input, .form-select, .form-textarea {
+            width: 100%; padding: 0.6rem 0.8rem; 
+            border: 1px solid var(--border-color); 
+            border-radius: 0.375rem;
+            background-color: #f9fafb; /* gray-50 */
+            transition: all 0.2s ease-in-out;
+        }
+        .form-input:focus, .form-select:focus, .form-textarea:focus { 
+            border-color: var(--primary-color); 
+            outline: none; 
+            box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+            background-color: white;
+        }
+        .action-button { 
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.6rem 1.2rem; 
+            background-color: var(--primary-color); 
+            color: white; 
+            font-weight: 500;
+            border-radius: 0.375rem; 
+            transition: background-color 0.3s; 
+            cursor: pointer; 
+            border: none;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        }
+        .action-button:hover { background-color: var(--primary-hover); }
+        .secondary-action-button { background-color: #64748b; /* slate-500 */ }
+        .secondary-action-button:hover { background-color: #475569; /* slate-600 */ }
+        .delete-button { background-color: var(--danger-color); }
+        .delete-button:hover { background-color: var(--danger-hover); }
+        .edit-button { background-color: var(--warning-color); }
+        .edit-button:hover { background-color: var(--warning-hover); }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 1.5rem; }
+        th, td { border: 1px solid var(--border-color); padding: 0.75rem 1rem; text-align: right; vertical-align: middle; }
+        th { background-color: #f8fafc; /* slate-50 */ font-weight: 600; color: var(--text-secondary); }
+        tbody tr:nth-child(even) { background-color: #f8fafc; }
+        tbody tr:hover { background-color: #f1f5f9; }
+
+        .modal-overlay { position: fixed; inset: 0; background-color: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 9999; backdrop-filter: blur(4px); }
+        .modal-content { 
+            background-color: white; 
+            padding: 0;
+            border-radius: 0.75rem; 
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); 
+            max-width: 500px; 
+            width: 90%; 
+            max-height: 90vh; 
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .modal-header { padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-color); }
+        .modal-body { padding: 1.5rem; overflow-y: auto; }
+        .modal-footer { padding: 1rem 1.5rem; border-top: 1px solid var(--border-color); background-color: #f8fafc; display: flex; justify-content: flex-end; gap: 0.5rem; }
+        #qr-reader { width: 100%; max-width: 500px; margin: 1rem auto; border-radius: 0.5rem; overflow: hidden; }
+    </style>
+</head>
+<body class="antialiased">
+
+    <!-- The root element for our React app -->
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // Destructure necessary functions from React
+        const { useState, useEffect, createContext, useContext, useMemo, useCallback, useRef } = React;
+
+        // --- LOCAL STORAGE KEYS ---
+        const APP_USERS_LS_KEY = 'qrAttendanceApp_appUsers_v10';
+        const LOGGED_IN_USER_LS_KEY = 'qrAttendanceApp_loggedInUser_v10';
+        const GROUPS_LS_KEY = 'qrAttendanceApp_groups_v10';
+        const SETTINGS_LS_KEY = 'qrAttendanceApp_settings_v10';
+        const STUDENTS_LS_KEY = 'qrAttendanceApp_students_v10';
+        const ATTENDANCE_LS_KEY = 'qrAttendanceApp_attendanceRecords_v10';
+        const QURAN_COMPETITIONS_LS_KEY = 'qrAttendanceApp_quranCompetitions_v10';
+        const MEMORIZATION_TESTS_LS_KEY = 'qrAttendanceApp_memorizationTests_v10';
+        
+        // --- DEFAULT ADMIN USER ---
+        const DEFAULT_ADMIN_USERNAME = "admin";
+        const DEFAULT_ADMIN_DATA = { password: "adminpassword", role: "المسؤول العام", permissions: ["all", "manage_users", "manage_settings", "manage_students", "record_attendance", "view_records", "view_stats", "manage_data", "manage_competitions", "manage_tests", "perform_draw"] };
+
+        // --- HELPER FUNCTIONS ---
+        const getFormattedDate = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        const getFormattedTime = (date = new Date()) => `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`;
+        const getFormattedDateWithDay = (dateString) => {
+            if (!dateString) return '';
+            const date = new Date(dateString + 'T00:00:00');
+            return date.toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        };
+        const generateQrCodeImgSrc = (data) => `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(data)}&ecc=M&charset-source=UTF-8&charset-target=UTF-8`;
+        const calculateAge = (dobString) => {
+            if (!dobString) return null;
+            try {
+                const birthDate = new Date(dobString);
+                if (isNaN(birthDate.getTime())) return null;
+                const today = new Date();
+                let age = today.getFullYear() - birthDate.getFullYear();
+                const m = today.getMonth() - birthDate.getMonth();
+                if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
+                return age >= 0 ? age : null;
+            } catch (e) {
+                console.error("Error calculating age:", e);
+                return null;
+            }
+        };
+
+        // --- CONTEXTS for State Management ---
+        const AuthContext = createContext();
+        const DataContext = createContext();
+        const UIContext = createContext();
+
+        // --- PROVIDERS ---
+        const UIProvider = ({ children }) => {
+            const [toast, setToast] = useState({ show: false, message: '', isError: false });
+            const [confirmModal, setConfirmModal] = useState({ show: false, message: '', title: '', onConfirm: null, onCancel: null });
+
+            const showToast = useCallback((message, isError = false) => {
+                setToast({ show: true, message, isError });
+                setTimeout(() => setToast({ show: false, message: '', isError: false }), 3000);
+            }, []);
+
+            const showConfirm = useCallback(({ title, message }) => {
+                return new Promise((resolve) => {
+                    setConfirmModal({
+                        show: true, title, message,
+                        onConfirm: () => { setConfirmModal({ show: false }); resolve(true); },
+                        onCancel: () => { setConfirmModal({ show: false }); resolve(false); }
+                    });
+                });
+            }, []);
+            
+            const value = { showToast, showConfirm, confirmModal };
+            return <UIContext.Provider value={value}><>{children}<Toast toast={toast} /></></UIContext.Provider>;
+        };
+
+        const DataProvider = ({ children }) => {
+            const [appUsersData, setAppUsersData] = useState({});
+            const [students, setStudents] = useState([]);
+            const [attendanceRecords, setAttendanceRecords] = useState({});
+            const [groups, setGroups] = useState([]);
+            const [systemSettings, setSystemSettings] = useState({ dayActivities: { 0: "", 1: "", 2: "قرآن كريم", 3: "", 4: "", 5: "دروس دينية وتعليمية", 6: "قرآن كريم" } });
+            const [quranCompetitions, setQuranCompetitions] = useState([]);
+            const [memorizationTests, setMemorizationTests] = useState([]);
+            const [isDataLoaded, setIsDataLoaded] = useState(false);
+            
+            const loadFromLocalStorage = (key, defaultValue) => {
+                const stored = localStorage.getItem(key);
+                try { return stored ? JSON.parse(stored) : defaultValue; } catch (e) { return defaultValue; }
+            };
+
+            const saveToLocalStorage = (key, data) => localStorage.setItem(key, JSON.stringify(data));
+            
+            useEffect(() => {
+                let storedUsers = loadFromLocalStorage(APP_USERS_LS_KEY, null);
+                if(!storedUsers) {
+                    storedUsers = { [DEFAULT_ADMIN_USERNAME]: { ...DEFAULT_ADMIN_DATA } };
+                    saveToLocalStorage(APP_USERS_LS_KEY, storedUsers);
+                }
+                if (storedUsers[DEFAULT_ADMIN_USERNAME]) {
+                    const adminUser = storedUsers[DEFAULT_ADMIN_USERNAME];
+                    let updated = false;
+                    DEFAULT_ADMIN_DATA.permissions.forEach(perm => {
+                        if (!adminUser.permissions.includes(perm)) { adminUser.permissions.push(perm); updated = true; }
+                    });
+                    if (updated) saveToLocalStorage(APP_USERS_LS_KEY, storedUsers);
+                }
+                setAppUsersData(storedUsers);
+                setStudents(loadFromLocalStorage(STUDENTS_LS_KEY, []));
+                setAttendanceRecords(loadFromLocalStorage(ATTENDANCE_LS_KEY, {}));
+                setGroups(loadFromLocalStorage(GROUPS_LS_KEY, []));
+                setSystemSettings(loadFromLocalStorage(SETTINGS_LS_KEY, { dayActivities: { 0: "", 1: "", 2: "قرآن كريم", 3: "", 4: "", 5: "دروس دينية وتعليمية", 6: "قرآن كريم" }}));
+                setQuranCompetitions(loadFromLocalStorage(QURAN_COMPETITIONS_LS_KEY, []));
+                setMemorizationTests(loadFromLocalStorage(MEMORIZATION_TESTS_LS_KEY, []));
+                setIsDataLoaded(true);
+            }, []);
+
+            const saveStudents = data => { setStudents(data); saveToLocalStorage(STUDENTS_LS_KEY, data); };
+            const saveAttendance = data => { setAttendanceRecords(data); saveToLocalStorage(ATTENDANCE_LS_KEY, data); };
+            const saveGroups = data => { setGroups(data); saveToLocalStorage(GROUPS_LS_KEY, data); };
+            const saveSettings = data => { setSystemSettings(data); saveToLocalStorage(SETTINGS_LS_KEY, data); };
+            const saveAppUsers = data => { setAppUsersData(data); saveToLocalStorage(APP_USERS_LS_KEY, data); };
+            const saveQuranCompetitions = data => { setQuranCompetitions(data); saveToLocalStorage(QURAN_COMPETITIONS_LS_KEY, data); };
+            const saveMemorizationTests = data => { setMemorizationTests(data); saveToLocalStorage(MEMORIZATION_TESTS_LS_KEY, data); };
+            
+            const importData = (data) => {
+                saveStudents((data.students || []).map(s => ({ nationalId: '', dob: '', age: null, guardianPhone: '', studentPhoneNumber: '', grade: '', photo: null, ...s })));
+                saveAttendance(data.attendanceRecords || {});
+                saveSettings({ ...systemSettings, ...(data.systemSettings || {}) });
+                saveGroups(data.groups || []);
+                saveAppUsers(data.appUsersData || {});
+                saveQuranCompetitions(data.quranCompetitions || []);
+                saveMemorizationTests(data.memorizationTests || []);
+            };
+            
+            const exportData = () => ({ students, attendanceRecords, systemSettings, groups, appUsersData, quranCompetitions, memorizationTests });
+
+            const value = { appUsersData, saveAppUsers, students, saveStudents, attendanceRecords, saveAttendance, groups, saveGroups, systemSettings, saveSettings, quranCompetitions, saveQuranCompetitions, memorizationTests, saveMemorizationTests, isDataLoaded, importData, exportData };
+            return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
+        };
+
+        const AuthProvider = ({ children }) => {
+            const [loggedInUser, setLoggedInUser] = useState(null);
+            const { showToast } = useContext(UIContext);
+            const dataContext = useContext(DataContext);
+
+            useEffect(() => {
+                if(dataContext.isDataLoaded) {
+                    const storedUser = localStorage.getItem(LOGGED_IN_USER_LS_KEY);
+                    if (storedUser) {
+                        const parsedUser = JSON.parse(storedUser);
+                        if (dataContext.appUsersData && dataContext.appUsersData[parsedUser.username]) {
+                            parsedUser.permissions = dataContext.appUsersData[parsedUser.username].permissions;
+                            parsedUser.role = dataContext.appUsersData[parsedUser.username].role;
+                            setLoggedInUser(parsedUser);
+                        }
+                    }
+                }
+            }, [dataContext.isDataLoaded, dataContext.appUsersData]);
+            
+            const login = (username, password) => {
+                const user = dataContext.appUsersData[username];
+                if (user && user.password === password) {
+                    const userToLogin = { username, role: user.role, permissions: [...user.permissions] };
+                    localStorage.setItem(LOGGED_IN_USER_LS_KEY, JSON.stringify(userToLogin));
+                    setLoggedInUser(userToLogin);
+                    showToast(`مرحباً بك، ${username}`);
+                    return true;
+                }
+                showToast('اسم المستخدم أو كلمة المرور غير صحيحة.', true);
+                return false;
+            };
+
+            const logout = () => { localStorage.removeItem(LOGGED_IN_USER_LS_KEY); setLoggedInUser(null); showToast('تم تسجيل الخروج بنجاح.'); };
+
+            const hasPermission = useCallback((permissionKey) => {
+                if (!loggedInUser) return false;
+                const keyWithoutView = permissionKey.replace('View', '');
+                return loggedInUser.permissions.includes("all") || loggedInUser.permissions.includes(keyWithoutView);
+            }, [loggedInUser]);
+            
+            const changePassword = (currentPassword, newPassword) => {
+                if(dataContext.appUsersData[loggedInUser.username].password === currentPassword) {
+                    dataContext.saveAppUsers({ ...dataContext.appUsersData, [loggedInUser.username]: { ...dataContext.appUsersData[loggedInUser.username], password: newPassword } });
+                    showToast("تم تغيير كلمة المرور بنجاح."); return true;
+                }
+                showToast("كلمة المرور الحالية غير صحيحة.", true); return false;
+            };
+
+            const value = { loggedInUser, login, logout, hasPermission, changePassword };
+            return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+        };
+
+        // --- CORE UI COMPONENTS ---
+        const Toast = ({toast}) => { if (!toast.show) return null; return <div className={`fixed bottom-5 left-1/2 -translate-x-1/2 text-white px-5 py-2.5 rounded-md shadow-lg z-[10000] transition-opacity duration-300 ${toast.isError ? 'bg-red-500' : 'bg-green-500'}`}>{toast.message}</div>; };
+        const ConfirmModal = ({ title, message, onConfirm, onCancel }) => ( <div className="modal-overlay"><div className="modal-content"><div className="modal-header"><h3 className="text-lg font-bold text-gray-800">{title}</h3></div><div className="modal-body"><p className="text-gray-600">{message}</p></div><div className="modal-footer"><button onClick={onCancel} className="action-button secondary-action-button">إلغاء</button><button onClick={onConfirm} className="action-button">تأكيد</button></div></div></div> );
+        const LoginView = () => { const [username, setUsername] = useState(''); const [password, setPassword] = useState(''); const { login } = useContext(AuthContext); const handleSubmit = (e) => { e.preventDefault(); login(username, password); }; return <div className="flex flex-col items-center justify-center min-h-[80vh] container mx-auto p-4 md:p-6"><div className="bg-white p-8 rounded-xl shadow-md max-w-md w-full"><h1 className="text-3xl font-bold text-teal-700 text-center mb-6">تسجيل الدخول</h1><form onSubmit={handleSubmit} className="space-y-4"><div><label htmlFor="username" className="block text-sm font-medium text-neutral-700 mb-1">اسم المستخدم:</label><input type="text" id="username" className="form-input" required value={username} onChange={(e) => setUsername(e.target.value)} /></div><div><label htmlFor="password" className="block text-sm font-medium text-neutral-700 mb-1">كلمة المرور:</label><input type="password" id="password" className="form-input" required value={password} onChange={(e) => setPassword(e.target.value)} /></div><button type="submit" className="action-button w-full justify-center">دخول</button></form><p className="mt-6 text-xs text-neutral-500 text-center">مستخدم افتراضي للمسؤول: {DEFAULT_ADMIN_USERNAME} / {DEFAULT_ADMIN_DATA.password}<br/>يرجى تغيير كلمة المرور بعد تسجيل الدخول الأول.</p></div></div>; };
+        const Header = () => { const { logout } = useContext(AuthContext); return <header className="text-center mb-6 pb-4 border-b border-gray-200 flex justify-between items-center"><div><h1 className="text-3xl md:text-4xl font-bold text-teal-700">نظام إدارة حضور الطلاب</h1><p className="mt-2 text-lg text-gray-500">مسجد الرحمة</p></div><div><button onClick={logout} className="action-button secondary-action-button text-sm">تسجيل الخروج</button></div></header>; };
+        const Nav = ({ currentView, setCurrentView }) => {
+            const { hasPermission } = useContext(AuthContext);
+            const navItems = [ 
+                { view: "introView", label: "مقدمة", permission: "any", icon: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> }, 
+                { view: "studentsView", label: "إدارة الطلاب", permission: "manage_students", icon: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> },
+                { view: "attendanceView", label: "تسجيل الحضور", permission: "record_attendance", icon: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0-2 2c0 1.03.81 2.44 2 3 1.19-.56 2-1.97 2-3a2 2 0 0 0-2-2Z"/><path d="m14.24 13.76.01.01"/><path d="m16.5 10.27.01.01"/><path d="m19.76 13.76.01.01"/><path d="m16.5 17.73.01.01"/><path d="m14.24 13.76.01.01"/></svg> },
+                { view: "recordsView", label: "عرض السجلات", permission: "view_records", icon: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/><path d="m9 16 2 2 4-4"/></svg> },
+                { view: "quranCompetitionsView", label: "المسابقات القرآنية", permission: "manage_competitions", icon: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/><path d="m12 6-2 5 2 5"/><path d="M12 6h7.5"/><path d="M12 16h7.5"/></svg> }, 
+                { view: "memorizationTestsView", label: "اختبارات التحفيظ", permission: "manage_tests", icon: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15.5 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.5L15.5 3Z"/><path d="M15 3v6h6"/><path d="m10 16-4-4 1.5-1.5 2.5 2.5 5-5L16.5 9"/></svg> }, 
+                { view: "randomRewardDrawView", label: "سحب المكافآت", permission: "perform_draw", icon: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.168 18.168A10 10 0 1 1 12 2a10 10 0 0 1 9.168 16.168Z"/><path d="m3.8 14.8.4-1 .4 1"/><path d="m19.8 14.8.4-1 .4 1"/><path d="M8.2 4.2 9 5l.8-1.2"/><path d="M15.8 4.2 15 5l-.8-1.2"/><path d="m12 2 1.4 2.5"/><path d="M12 22l1.4-2.5"/><path d="m2 10 2.5-1.4"/><path d="m22 10-2.5-1.4"/><circle cx="12" cy="12" r="4"/></svg> }, 
+                { view: "statsView", label: "الإحصائيات", permission: "view_stats", icon: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="M18.7 8a6 6 0 0 0-6-6"/><path d="M13 13a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/><path d="M12.7 18a6 6 0 0 0-6-6"/><path d="M21 21a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/></svg> }, 
+                { view: "settingsView", label: "إعدادات النظام", permission: "manage_settings", icon: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2l.15-.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg> },
+                { view: "userManagementView", label: "إدارة المستخدمين", permission: "manage_users", icon: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 19a6 6 0 0 0-12 0"/><circle cx="8" cy="10" r="4"/><path d="M14 19a6 6 0 0 0-12 0"/><circle cx="8" cy="10" r="4"/><path d="M22 19a6 6 0 0 0-6-6 4 4 0 1 0 0-8"/></svg> },
+                { view: "accountView", label: "بيانات حسابي", permission: "any", icon: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="10" r="3"/><path d="M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662"/></svg> },
+                { view: "dataManagementView", label: "إدارة البيانات", permission: "manage_data", icon: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg> },
+            ];
+            return <div className="md:col-span-1 bg-white p-2 rounded-lg shadow-sm"><nav className="flex flex-row overflow-x-auto md:flex-col md:overflow-x-visible gap-1">{navItems.map(item => { const isEnabled = item.permission === 'any' || hasPermission(item.permission); return <button key={item.view} onClick={() => isEnabled && setCurrentView(item.view)} disabled={!isEnabled} className={`main-nav-button ${currentView === item.view ? 'active' : ''} ${!isEnabled ? 'disabled' : ''}`}>{item.icon}<span>{item.label}</span></button> })}</nav></div>;
+        };
+        
+        // --- ALL VIEW COMPONENTS ---
+        const IntroView = () => ( <section className="p-4 md:p-6 bg-white rounded-lg shadow-sm"><h2 className="text-2xl font-semibold text-teal-600 mb-4">مرحباً بك في نظام إدارة الحضور المطور!</h2><div className="info-box"><h3 className="text-lg mb-2">مستخدم حالي: <span className="font-bold">{useContext(AuthContext).loggedInUser.username} ({useContext(AuthContext).loggedInUser.role})</span></h3></div><div className="info-box bg-blue-50 border-blue-300"><h3 className="text-lg mb-2 text-blue-700">إرشادات الاستخدام</h3><ul className="list-disc list-inside space-y-1 text-sm text-blue-800"><li>لرؤية باقي البيانات في الجداول الطويلة، يمكنك استخدام عجلة الفأرة (الاسكرول) أو شريط التمرير الجانبي.</li><li>في النوافذ المنبثقة التي تحتوي على نماذج طويلة، سيظهر شريط تمرير داخلي يمكنك استخدامه للوصول إلى جميع الحقول.</li></ul></div><div className="info-box"><h3 className="text-lg mb-2">مسح QR بالكاميرا:</h3><p className="text-sm text-yellow-700">في قسم "تسجيل الحضور"، يمكنك استخدام زر "مسح رمز QR بالكاميرا" لتفعيل كاميرا جهازك ومسح رمز الطالب مباشرة.<br/>سيتم تسجيل الحضور تلقائياً بعد المسح الناجح.<br/><strong>ملاحظات:</strong> قد تحتاج إلى منح إذن الوصول للكاميرا. للحصول على أفضل أداء، استخدم التطبيق عبر HTTPS.</p></div><div className="info-box"><h3 className="text-lg mb-2">أيام التسجيل والأنشطة المتاحة:</h3><p className="text-sm text-yellow-700">يمكنك تحديد الأنشطة لكل يوم من أيام الأسبوع في قسم "إعدادات النظام". الأيام التي يتم تحديد نشاط لها تعتبر أيام تسجيل وحضور متاحة.<br/>في قسم "تسجيل الحضور"، سيتم عرض نشاط اليوم الحالي أو تنبيه إذا لم يكن اليوم من أيام الحضور المعتمدة.</p></div><h3 className="text-xl font-medium text-neutral-700 mb-3">كيفية استخدام التطبيق:</h3><ol className="list-decimal list-inside space-y-2 text-neutral-700"><li><strong>تسجيل الدخول.</strong></li><li><strong>إدارة المستخدمين (للمسؤول):</strong> إضافة مشرفين جدد وتغيير كلمات المرور.</li><li><strong>إعدادات النظام (للمسؤول):</strong> إدارة المجموعات وتعيين المشرفين، وتحديد أيام وأنشطة الدروس.</li><li><strong>إدارة الطلاب:</strong> إضافة طلاب بمعلوماتهم الكاملة وتعديل بياناتهم.</li><li><strong>تسجيل الحضور:</strong> تسجيل حضور الطلاب (يدوياً أو بمسح QR).</li><li><strong>عرض السجلات:</strong> عرض سجلات الحضور مع بيانات الطلاب، وإمكانية تجهيز رسالة لولي الأمر.</li><li><strong>المسابقات القرآنية:</strong> تسجيل الطلاب في المسابقات وتحديد عدد الأجزاء.</li><li><strong>اختبارات التحفيظ:</strong> تسجيل نتائج اختبارات القرآن للطلاب.</li><li><strong>سحب المكافآت:</strong> اختيار طالب عشوائي من الحاضرين لمنحه مكافأة.</li><li><strong>الإحصائيات:</strong> عرض إحصائيات ورسوم بيانية للحضور الشهري.</li><li><strong>بيانات حسابي:</strong> عرض معلومات حسابك وتغيير كلمة المرور الخاصة بك.</li></ol></section> );
+        const StudentForm = ({ student, groups, onSubmit, onCancel }) => { const [formData, setFormData] = useState({ id: student ? student.id : '', name: student ? student.name : '', nationalId: student ? student.nationalId : '', dob: student ? student.dob : '', guardianPhone: student ? student.guardianPhone : '', studentPhoneNumber: student ? student.studentPhoneNumber : '', grade: student ? student.grade : '', groupId: student ? student.groupId : '', photo: student ? student.photo : null, }); const [photoPreview, setPhotoPreview] = useState(student ? student.photo : null); useEffect(() => { if (student) { setFormData({ id: student.id, name: student.name, nationalId: student.nationalId || '', dob: student.dob || '', guardianPhone: student.guardianPhone || '', studentPhoneNumber: student.studentPhoneNumber || '', grade: student.grade || '', groupId: student.groupId || '', photo: student.photo }); setPhotoPreview(student.photo); } }, [student]); const handleChange = (e) => { const { id, value } = e.target; setFormData(prev => ({ ...prev, [id]: value })); }; const handlePhotoChange = (e) => { const file = e.target.files[0]; if (file) { const reader = new FileReader(); reader.onloadend = () => { setPhotoPreview(reader.result); setFormData(prev => ({ ...prev, photo: reader.result })); }; reader.readAsDataURL(file); } }; const handleSubmit = (e) => { e.preventDefault(); if (!formData.id.trim() || !formData.name.trim()) { alert("الرقم التعريفي واسم الطالب مطلوبان."); return; } onSubmit({ ...formData, id: formData.id.trim(), name: formData.name.trim(), qrValue: formData.id.trim(), age: calculateAge(formData.dob) }); }; return <> <h3 className="text-xl font-medium text-neutral-700 mb-3">{student ? `تعديل بيانات الطالب: ${student.name}` : 'إضافة طالب جديد:'}</h3> <form onSubmit={handleSubmit} className="space-y-3"> <div className="grid md:grid-cols-2 gap-4"> <div><label htmlFor="id" className="block text-sm font-medium text-neutral-700 mb-1">الرقم التعريفي (لـ QR):</label><input type="text" id="id" className="form-input" required value={formData.id} onChange={handleChange} /></div> <div><label htmlFor="name" className="block text-sm font-medium text-neutral-700 mb-1">اسم الطالب:</label><input type="text" id="name" className="form-input" required value={formData.name} onChange={handleChange} /></div> <div><label htmlFor="nationalId" className="block text-sm font-medium text-neutral-700 mb-1">الرقم القومي/شهادة الميلاد:</label><input type="text" id="nationalId" className="form-input" value={formData.nationalId} onChange={handleChange} /></div> <div><label htmlFor="dob" className="block text-sm font-medium text-neutral-700 mb-1">تاريخ الميلاد:</label><input type="date" id="dob" className="form-input" value={formData.dob} onChange={handleChange} /></div> <div><label className="block text-sm font-medium text-neutral-700 mb-1">السن:</label><input type="text" className="form-input bg-neutral-100" readOnly value={calculateAge(formData.dob) || ''} placeholder="يُحسب تلقائيًا"/></div> <div><label htmlFor="guardianPhone" className="block text-sm font-medium text-neutral-700 mb-1">رقم هاتف ولي الأمر:</label><input type="tel" id="guardianPhone" className="form-input" value={formData.guardianPhone} onChange={handleChange} /></div> <div><label htmlFor="studentPhoneNumber" className="block text-sm font-medium text-neutral-700 mb-1">رقم هاتف الطالب (إن وجد):</label><input type="tel" id="studentPhoneNumber" className="form-input" value={formData.studentPhoneNumber} onChange={handleChange} /></div> <div><label htmlFor="grade" className="block text-sm font-medium text-neutral-700 mb-1">الصف الدراسي:</label><input type="text" id="grade" className="form-input" value={formData.grade} onChange={handleChange} /></div> <div><label htmlFor="groupId" className="block text-sm font-medium text-neutral-700 mb-1">المجموعة (اختياري):</label> <select id="groupId" className="form-select" value={formData.groupId} onChange={handleChange}> <option value="">بدون مجموعة</option> {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)} </select> </div> <div> <label htmlFor="photo" className="block text-sm font-medium text-neutral-700 mb-1">صورة الطالب (اختياري):</label> <input type="file" id="photo" className="form-file" accept="image/*" onChange={handlePhotoChange}/> <div className="w-[100px] h-[120px] border border-dashed border-neutral-300 rounded-md flex items-center justify-center overflow-hidden bg-gray-50 mt-1"> <img src={photoPreview || 'https://placehold.co/100x120/EEE/333?text=معاينة'} alt="معاينة الصورة" className="max-w-full max-h-full object-cover" /> </div> </div> </div> <button type="submit" className="action-button w-full md:w-auto mt-4">{student ? 'تحديث بيانات الطالب' : 'إضافة الطالب'}</button> {student && <button type="button" onClick={onCancel} className="action-button secondary-action-button w-full md:w-auto mt-4 mr-2">إلغاء التعديل</button>} </form> </>; };
+        const StudentList = ({ students, groups, onEdit, onDelete }) => { if (students.length === 0) { return <p className="text-neutral-500">لا يوجد طلاب لعرضهم.</p>; } return <div className="overflow-x-auto"><table className="min-w-full text-sm"><thead><tr><th className="p-2 border">صورة</th><th className="p-2 border">الرقم التعريفي (QR)</th><th className="p-2 border">الاسم</th><th className="p-2 border">السن</th><th className="p-2 border">المجموعة</th><th className="p-2 border">رمز QR</th><th className="p-2 border">إجراءات</th></tr></thead><tbody>{students.map(student => <tr key={student.id}><td className="p-2 border"><img src={student.photo || 'https://placehold.co/60x80/EEE/333?text=لا+صورة'} alt={`صورة ${student.name}`} className="max-w-[60px] max-h-[80px] object-cover rounded-sm mx-auto" /></td><td className="p-2 border">{student.id}</td><td className="p-2 border">{student.name}</td><td className="p-2 border">{student.age ?? 'غير معروف'}</td><td className="p-2 border">{student.groupId ? (groups.find(g => g.id === student.groupId)?.name || "غير محدد") : "بدون مجموعة"}</td><td className="p-2 border"><img src={generateQrCodeImgSrc(student.qrValue)} alt={`QR ${student.name}`} className="mx-auto" /></td><td className="p-2 border"><button onClick={() => onEdit(student)} className="action-button edit-button text-xs px-2 py-1 mr-1">تعديل</button><button onClick={() => onDelete(student.id)} className="action-button delete-button text-xs px-2 py-1">حذف</button></td></tr>)}</tbody></table></div>; };
+        const StudentsView = () => { const { students, saveStudents, groups, attendanceRecords, saveAttendance, quranCompetitions, saveQuranCompetitions, memorizationTests, saveMemorizationTests } = useContext(DataContext); const { showToast, showConfirm } = useContext(UIContext); const [filterGroup, setFilterGroup] = useState('all'); const [editingStudent, setEditingStudent] = useState(null); const [newStudentQrVal, setNewStudentQrVal] = useState(null); const resetForm = () => { setEditingStudent(null); setNewStudentQrVal(null); }; const handleStudentSubmit = (studentData) => { if (editingStudent) { const updatedStudents = students.map(s => s.id === editingStudent.id ? { ...s, ...studentData, id: studentData.qrValue } : s); if(editingStudent.id !== studentData.qrValue) { const oldId = editingStudent.id; const newId = studentData.qrValue; const updatedAttendance = { ...attendanceRecords }; Object.keys(updatedAttendance).forEach(date => { updatedAttendance[date] = updatedAttendance[date].map(rec => rec.id === oldId ? { ...rec, id: newId } : rec); }); saveAttendance(updatedAttendance); const updatedCompetitions = quranCompetitions.map(c => c.studentId === oldId ? { ...c, studentId: newId } : c); saveQuranCompetitions(updatedCompetitions); const updatedTests = memorizationTests.map(t => t.studentId === oldId ? { ...t, studentId: newId } : t); saveMemorizationTests(updatedTests); } saveStudents(updatedStudents); showToast('تم تحديث بيانات الطالب بنجاح.'); } else { if (students.find(s => s.id === studentData.id)) { showToast('الرقم التعريفي (QR) موجود بالفعل.', true); return; } saveStudents([...students, studentData]); setNewStudentQrVal(studentData.qrValue); showToast('تم إضافة الطالب بنجاح.'); } resetForm(); }; const handleDeleteStudent = async (studentId) => { const student = students.find(s => s.id === studentId); const confirmed = await showConfirm({ title: "تأكيد الحذف", message: `هل أنت متأكد من حذف الطالب: ${student.name}؟ سيتم حذف جميع سجلاته.` }); if (confirmed) { saveStudents(students.filter(s => s.id !== studentId)); const updatedAttendance = { ...attendanceRecords }; Object.keys(updatedAttendance).forEach(date => { updatedAttendance[date] = updatedAttendance[date].filter(rec => rec.id !== studentId); if(updatedAttendance[date].length === 0) delete updatedAttendance[date]; }); saveAttendance(updatedAttendance); saveQuranCompetitions(quranCompetitions.filter(c => c.studentId !== studentId)); saveMemorizationTests(memorizationTests.filter(t => t.studentId !== studentId)); showToast('تم حذف الطالب وجميع سجلاته.'); } }; const filteredStudents = useMemo(() => { if (filterGroup === 'all') return students; if (filterGroup === 'none') return students.filter(s => !s.groupId || s.groupId === ""); return students.filter(s => s.groupId === filterGroup); }, [students, filterGroup]); return <section className="p-4 md:p-6 bg-white rounded-lg shadow-sm"><h2 className="text-2xl font-bold text-gray-800 mb-6">إدارة الطلاب</h2><div className="grid md:grid-cols-3 gap-6 mb-6"><div className="md:col-span-2"><StudentForm key={editingStudent ? editingStudent.id : 'new'} student={editingStudent} groups={groups} onSubmit={handleStudentSubmit} onCancel={resetForm} /></div><div className="pt-4 md:pt-0"><h3 className="text-xl font-medium text-neutral-700 mb-3">رمز QR للطالب المضاف:</h3><div className="qr-code-container h-40 flex items-center justify-center bg-neutral-50 rounded-md border border-dashed border-neutral-300">{newStudentQrVal ? <img src={generateQrCodeImgSrc(newStudentQrVal)} alt={`QR for ${newStudentQrVal}`} /> : <p className="text-neutral-500">سيظهر رمز QR هنا.</p>}</div></div></div><hr className="my-8" /><div className="flex justify-between items-center mb-3"><h3 className="text-xl font-medium text-neutral-700">قائمة الطلاب</h3><div className="max-w-xs"><label htmlFor="filterStudentGroup" className="block text-sm font-medium text-neutral-700 mb-1">تصفية حسب المجموعة:</label><select id="filterStudentGroup" className="form-select" value={filterGroup} onChange={e => setFilterGroup(e.target.value)}><option value="all">جميع المجموعات</option><option value="none">بدون مجموعة</option>{groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select></div></div><StudentList students={filteredStudents} groups={groups} onEdit={setEditingStudent} onDelete={handleDeleteStudent} /></section>; };
+        const QRScanner = ({ onScanSuccess }) => { const { showToast } = useContext(UIContext); const scannerRef = useRef(null); const [isScanning, setIsScanning] = useState(false); const startScan = () => { if(scannerRef.current) return; const html5QrCode = new Html5Qrcode("qr-reader"); scannerRef.current = html5QrCode; setIsScanning(true); const config = { fps: 10, qrbox: { width: 250, height: 250 } }; html5QrCode.start({ facingMode: "environment" }, config, (decodedText, decodedResult) => { stopScan(); onScanSuccess(decodedText); }, (errorMessage) => {}) .catch((err) => { showToast(`خطأ في تفعيل الكاميرا: ${err}. تأكد من منح الأذونات.`, true); setIsScanning(false); }); }; const stopScan = () => { if (scannerRef.current && scannerRef.current.isScanning) { scannerRef.current.stop().then(() => { scannerRef.current = null; setIsScanning(false); }).catch(err => console.error("Failed to stop scanner", err)); } }; useEffect(() => { return () => { if (scannerRef.current && scannerRef.current.isScanning) { stopScan(); } }; }, []); return <div className="mb-4">{!isScanning ? <button onClick={startScan} className="action-button secondary-action-button mb-2">مسح رمز QR بالكاميرا</button> : <button onClick={stopScan} className="action-button delete-button mb-2">إيقاف المسح</button>}<div id="qr-reader" style={{ display: isScanning ? 'block' : 'none' }}></div></div>; };
+        const AttendanceView = () => { const { students, attendanceRecords, saveAttendance, systemSettings } = useContext(DataContext); const { showToast } = useContext(UIContext); const [studentId, setStudentId] = useState(''); const [message, setMessage] = useState({ text: '', isSuccess: false }); const today = new Date(); const todayDateStr = getFormattedDate(today); const activityForToday = systemSettings.dayActivities[today.getDay()] || ""; const isAttendanceAllowed = activityForToday !== ""; const handleRecordAttendance = (idToRecord) => { if (!idToRecord) { displayMessage('الرجاء إدخال الرقم التعريفي.', false); return; } if (!isAttendanceAllowed) { displayMessage(`لا يمكن تسجيل الحضور. اليوم ليس من أيام الحضور المحددة.`, false); return; } const student = students.find(s => s.id === idToRecord); if (!student) { displayMessage('الطالب غير موجود.', false); return; } const todaysAttendance = attendanceRecords[todayDateStr] || []; if (todaysAttendance.find(att => att.id === idToRecord)) { displayMessage(`حضور ${student.name} مسجل بالفعل لهذا اليوم.`, false); } else { const newRecord = { id: student.id, name: student.name, time: getFormattedTime(today), groupId: student.groupId || "", activity: activityForToday, photo: student.photo, grade: student.grade, guardianPhone: student.guardianPhone }; const updatedAttendance = { ...attendanceRecords, [todayDateStr]: [...todaysAttendance, newRecord] }; saveAttendance(updatedAttendance); displayMessage(`تم تسجيل حضور ${student.name} (نشاط: ${activityForToday}) بنجاح.`, true); showToast(`تم تسجيل حضور ${student.name}.`); } setStudentId(''); }; const handleSubmit = (e) => { e.preventDefault(); handleRecordAttendance(studentId); }; const displayMessage = (text, isSuccess) => { setMessage({ text, isSuccess }); setTimeout(() => setMessage({ text: '', isSuccess: false }), 5000); }; return <section className="p-4 md:p-6 bg-white rounded-lg shadow-sm"><h2 className="text-2xl font-bold text-gray-800 mb-6">تسجيل الحضور</h2><p className="mb-3 text-neutral-700">التاريخ الحالي: <strong className="text-teal-700">{today.toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</strong></p><div className={`mb-3 p-3 rounded-md text-sm ${isAttendanceAllowed ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800'}`}>{isAttendanceAllowed ? `نشاط اليوم: ${activityForToday}. تسجيل الحضور متاح.` : `تنبيه: اليوم ليس من أيام الحضور المعتمدة.`}</div><QRScanner onScanSuccess={handleRecordAttendance} /><form onSubmit={handleSubmit} className="space-y-3 max-w-md"><div><label htmlFor="scannedStudentId" className="block text-sm font-medium text-neutral-700 mb-1">الرقم التعريفي للطالب (من QR أو يدوي):</label><input type="text" id="scannedStudentId" className="form-input" required placeholder="الرقم التعريفي" value={studentId} onChange={e => setStudentId(e.target.value)} /></div><button type="submit" className="action-button">تسجيل الحضور يدويًا</button></form>{message.text && <div className={`mt-4 p-3 rounded-md text-sm ${message.isSuccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{message.text}</div>}</section>; };
+        const AccountView = () => { const { loggedInUser, changePassword } = useContext(AuthContext); const { showToast } = useContext(UIContext); const [isModalOpen, setIsModalOpen] = useState(false); const [passwords, setPasswords] = useState({ current: '', new: '', confirm: '' }); const handlePasswordChange = (e) => { e.preventDefault(); if(passwords.new !== passwords.confirm) { showToast("كلمتا المرور الجديدتان غير متطابقتين.", true); return; } if(changePassword(passwords.current, passwords.new)) { setIsModalOpen(false); setPasswords({ current: '', new: '', confirm: '' }); } }; return <section className="p-4 md:p-6 bg-white rounded-lg shadow-sm"><h2 className="text-2xl font-bold text-gray-800 mb-6">بيانات حسابي</h2><div className="bg-neutral-50 p-6 rounded-lg shadow-inner space-y-4 max-w-md"><div><p className="text-neutral-700"><span className="font-medium">اسم المستخدم:</span> {loggedInUser.username}</p></div><div><p className="text-neutral-700"><span className="font-medium">الدور:</span> {loggedInUser.role}</p></div><button onClick={() => setIsModalOpen(true)} className="action-button edit-button w-full justify-center">تغيير كلمة المرور</button></div>{isModalOpen && <div className="modal-overlay"><div className="modal-content"><h3 className="modal-header text-xl font-semibold text-gray-800">تغيير كلمة المرور</h3><form onSubmit={handlePasswordChange}><div className="modal-body space-y-4"><input type="password" placeholder="كلمة المرور الحالية" value={passwords.current} onChange={e => setPasswords(p => ({...p, current: e.target.value}))} className="form-input" required /><input type="password" placeholder="كلمة المرور الجديدة" value={passwords.new} onChange={e => setPasswords(p => ({...p, new: e.target.value}))} className="form-input" required /><input type="password" placeholder="تأكيد كلمة المرور الجديدة" value={passwords.confirm} onChange={e => setPasswords(p => ({...p, confirm: e.target.value}))} className="form-input" required /></div><div className="modal-footer"><button type="button" onClick={() => setIsModalOpen(false)} className="action-button secondary-action-button">إلغاء</button><button type="submit" className="action-button">تغيير</button></div></form></div></div>}</section>; };
+        const DataManagementView = () => { const { importData, exportData } = useContext(DataContext); const { showToast, showConfirm } = useContext(UIContext); const fileInputRef = useRef(null); const handleExport = () => { const allData = exportData(); const dataStr = JSON.stringify(allData, null, 2); const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr); const linkElement = document.createElement('a'); linkElement.setAttribute('href', dataUri); linkElement.setAttribute('download', `بيانات_نظام_الحضور_${getFormattedDate()}.json`); linkElement.click(); showToast("تم تصدير البيانات بنجاح."); }; const handleImport = async (event) => { const file = event.target.files[0]; if(file) { const confirmed = await showConfirm({ title: "تأكيد الاستيراد", message: "تحذير: استيراد البيانات سيكتب فوق جميع البيانات الحالية. هل أنت متأكد؟" }); if(confirmed) { const reader = new FileReader(); reader.onload = (e) => { try { const imported = JSON.parse(e.target.result); if(imported.students && imported.appUsersData) { importData(imported); showToast("تم استيراد البيانات بنجاح. سيتم إعادة تحميل الصفحة لتطبيق التغييرات."); setTimeout(() => window.location.reload(), 1500); } else { showToast("ملف الاستيراد غير صالح أو ناقص.", true); } } catch(err) { showToast("خطأ في قراءة ملف الاستيراد.", true); } }; reader.readAsText(file); } event.target.value = null; } }; return <section className="p-4 md:p-6 bg-white rounded-lg shadow-sm"><h2 className="text-2xl font-bold text-gray-800 mb-6">إدارة البيانات</h2><div className="space-y-6"><div className="p-6 border rounded-lg"><h3 className="text-lg font-semibold mb-2">تصدير البيانات</h3><p className="text-gray-600 mb-4">تصدير جميع بيانات التطبيق (الطلاب، الحضور، الإعدادات، إلخ) في ملف JSON واحد.</p><button onClick={handleExport} className="action-button">تصدير الكل</button></div><div className="p-6 border rounded-lg"><h3 className="text-lg font-semibold mb-2">استيراد البيانات</h3><p className="text-gray-600 mb-4">استيراد البيانات من ملف JSON. <strong className="text-red-600">تحذير: هذا سيؤدي إلى الكتابة فوق جميع البيانات الحالية.</strong></p><input type="file" ref={fileInputRef} onChange={handleImport} accept=".json" className="hidden"/><button onClick={() => fileInputRef.current.click()} className="action-button secondary-action-button">اختيار ملف للاستيراد</button></div></div></section>; };
+        
+        const RecordsView = () => { /* Fully Developed */ const { attendanceRecords, students, groups } = useContext(DataContext); const { showToast } = useContext(UIContext); const [selectedDate, setSelectedDate] = useState(getFormattedDate()); const [filterGroup, setFilterGroup] = useState('all'); const [guardianModal, setGuardianModal] = useState({ isOpen: false, phone: '', message: '' }); const recordsForDate = useMemo(() => { const records = attendanceRecords[selectedDate] || []; if (filterGroup === 'all') return records; if (filterGroup === 'none') return records.filter(r => !r.groupId); return records.filter(r => r.groupId === filterGroup); }, [selectedDate, filterGroup, attendanceRecords]); const prepareGuardianNotification = (studentId) => { const record = recordsForDate.find(r => r.id === studentId); const student = students.find(s => s.id === studentId); const phone = record?.guardianPhone || student?.guardianPhone; if (!phone) { showToast("رقم هاتف ولي الأمر غير مسجل لهذا الطالب.", true); return; } const dateLocale = getFormattedDateWithDay(selectedDate); const message = `السلام عليكم ورحمة الله،\nنحيطكم علمًا بأن ابنكم/ابنتكم: ${record.name}\nقد حضر/ت اليوم: ${dateLocale}\nفي تمام الساعة: ${record.time}\nنشاط اليوم: ${record.activity}\n\nمع تحيات إدارة مسجد الرحمة.`; setGuardianModal({ isOpen: true, phone, message }); }; const copyToClipboard = () => { navigator.clipboard.writeText(guardianModal.message).then(() => showToast("تم نسخ الرسالة بنجاح!"), () => showToast("فشل النسخ.", true)); }; return <section className="p-4 md:p-6 bg-white rounded-lg shadow-sm"><h2 className="text-2xl font-bold text-gray-800 mb-6">عرض سجلات الحضور</h2>{guardianModal.isOpen && <div className="modal-overlay"><div className="modal-content"><h3 className="modal-header text-xl font-semibold">إرسال رسالة لولي الأمر</h3><div className="modal-body"><p className="mb-2 text-sm">رقم ولي الأمر: <span className="font-semibold">{guardianModal.phone}</span></p><textarea rows="5" className="form-textarea w-full" readOnly value={guardianModal.message}></textarea></div><div className="modal-footer"><button onClick={copyToClipboard} className="action-button">نسخ الرسالة</button><button onClick={() => setGuardianModal({ isOpen: false })} className="action-button secondary-action-button">إغلاق</button></div></div></div>}<div className="flex flex-wrap gap-4 mb-4 items-end"><div><label htmlFor="recordDate" className="block text-sm font-medium">اختر التاريخ:</label><input type="date" id="recordDate" className="form-input" value={selectedDate} onChange={e => setSelectedDate(e.target.value)}/></div><div><label htmlFor="filterRecordGroup" className="block text-sm font-medium">تصفية حسب المجموعة:</label><select id="filterRecordGroup" className="form-select" value={filterGroup} onChange={e => setFilterGroup(e.target.value)}><option value="all">جميع المجموعات</option><option value="none">بدون مجموعة</option>{groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select></div></div>{recordsForDate.length > 0 ? <div className="overflow-x-auto"><table className="min-w-full text-sm"><thead><tr><th>صورة</th><th>الاسم</th><th>وقت الحضور</th><th>إجراء</th></tr></thead><tbody>{recordsForDate.map(rec => { const studentDetails = students.find(s => s.id === rec.id); return <tr key={rec.id}><td><img src={rec.photo || studentDetails?.photo || 'https://placehold.co/60x80/EEE/333?text=لا+صورة'} alt={rec.name} className="w-12 h-16 object-cover rounded-md mx-auto"/></td><td>{rec.name}</td><td>{rec.time}</td><td><button onClick={() => prepareGuardianNotification(rec.id)} className="action-button text-xs px-2 py-1" disabled={!(studentDetails?.guardianPhone || rec.guardianPhone)}>رسالة لولي الأمر</button></td></tr>})}</tbody></table></div> : <p className="text-neutral-500 text-center py-8">لا توجد سجلات حضور للتاريخ المحدد.</p>}</section>; };
+        const GroupModal = ({ group, supervisors, onSave, onCancel }) => { const [name, setName] = useState(group ? group.name : ''); const [supervisor, setSupervisor] = useState(group ? group.supervisorUsername || '' : ''); const handleSubmit = (e) => { e.preventDefault(); onSave({ name, supervisorUsername: supervisor }); }; return <div className="modal-overlay"><div className="modal-content"><h3 className="modal-header text-xl font-semibold">{group ? 'تعديل المجموعة' : 'إضافة مجموعة جديدة'}</h3><form onSubmit={handleSubmit}><div className="modal-body space-y-4"><div><label className="block text-sm">اسم المجموعة:</label><input type="text" value={name} onChange={e => setName(e.target.value)} className="form-input" required/></div><div><label className="block text-sm">المشرف (اختياري):</label><select value={supervisor} onChange={e => setSupervisor(e.target.value)} className="form-select"><option value="">بدون مشرف</option>{supervisors.map(s => <option key={s} value={s}>{s}</option>)}</select></div></div><div className="modal-footer"><button type="button" onClick={onCancel} className="action-button secondary-action-button">إلغاء</button><button type="submit" className="action-button">حفظ</button></div></form></div></div>;};
+        const SettingsView = () => { const { groups, saveGroups, students, systemSettings, saveSettings, appUsersData } = useContext(DataContext); const { showToast, showConfirm } = useContext(UIContext); const [isGroupModalOpen, setIsGroupModalOpen] = useState(false); const [editingGroup, setEditingGroup] = useState(null); const [dayActivities, setDayActivities] = useState(systemSettings.dayActivities); const openGroupModal = (group = null) => { setEditingGroup(group); setIsGroupModalOpen(true); }; const handleGroupSave = (groupData) => { if (editingGroup) { saveGroups(groups.map(g => g.id === editingGroup.id ? { ...g, ...groupData } : g)); showToast("تم تحديث المجموعة."); } else { if (groups.find(g => g.name === groupData.name)) { showToast("اسم المجموعة موجود بالفعل.", true); return; } saveGroups([...groups, { id: `group-${Date.now()}`, ...groupData }]); showToast("تمت إضافة المجموعة."); } setIsGroupModalOpen(false); }; const handleGroupDelete = async (groupId) => { if (students.some(s => s.groupId === groupId)) { showToast("لا يمكن حذف المجموعة لأن بها طلاب. يرجى نقل الطلاب أولاً.", true); return; } if (await showConfirm({ title: 'تأكيد الحذف', message: 'هل أنت متأكد من حذف هذه المجموعة؟' })) { saveGroups(groups.filter(g => g.id !== groupId)); showToast("تم حذف المجموعة."); } }; const handleDayActivityChange = (dayIndex, value) => setDayActivities(prev => ({ ...prev, [dayIndex]: value })); const handleSaveActivities = () => { saveSettings({ ...systemSettings, dayActivities }); showToast("تم حفظ إعدادات الأنشطة."); }; const supervisors = Object.entries(appUsersData).filter(([, data]) => data.role === "مشرف").map(([username]) => username); return <section className="p-4 md:p-6 bg-white rounded-lg shadow-sm"><h2 className="text-2xl font-bold text-gray-800 mb-6">إعدادات النظام</h2><div className="mb-8 p-6 border rounded-lg"><h3 className="text-xl font-semibold text-gray-700 mb-4">إدارة المجموعات</h3><button onClick={() => openGroupModal()} className="action-button mb-4">إضافة مجموعة جديدة</button>{groups.length > 0 ? <div className="overflow-x-auto"><table className="min-w-full text-sm"><thead><tr><th>اسم المجموعة</th><th>المشرف</th><th>إجراءات</th></tr></thead><tbody>{groups.map(g => <tr key={g.id}><td>{g.name}</td><td>{g.supervisorUsername || 'بدون مشرف'}</td><td><button onClick={() => openGroupModal(g)} className="action-button edit-button text-xs px-2 py-1 mr-1">تعديل</button><button onClick={() => handleGroupDelete(g.id)} className="action-button delete-button text-xs px-2 py-1">حذف</button></td></tr>)}</tbody></table></div> : <p>لا توجد مجموعات.</p>}</div>{isGroupModalOpen && <GroupModal group={editingGroup} supervisors={supervisors} onSave={handleGroupSave} onCancel={() => setIsGroupModalOpen(false)} />}<div className="p-6 border rounded-lg"><h3 className="text-xl font-semibold text-gray-700 mb-4">إعدادات أيام وأنشطة الدروس</h3><div className="space-y-3">{["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"].map((day, index) => <div key={index} className="grid grid-cols-1 md:grid-cols-2 gap-2 items-center"><label className="font-medium">{day}:</label><input type="text" className="form-input" value={dayActivities[index] || ''} onChange={(e) => handleDayActivityChange(index, e.target.value)} placeholder="نشاط اليوم (اتركه فارغًا لتعطيل الحضور)"/></div>)}</div><button onClick={handleSaveActivities} className="action-button mt-4">حفظ إعدادات الأنشطة</button></div></section>; };
+        const UserModal = ({ user, onSave, onCancel }) => { const [username, setUsername] = useState(user ? user.username : ''); const [password, setPassword] = useState(''); const handleSubmit = (e) => { e.preventDefault(); if(!password) { alert("كلمة المرور مطلوبة"); return; } onSave({ username, password }); }; return <div className="modal-overlay"><div className="modal-content"><h3 className="modal-header text-xl font-semibold">{user ? `تغيير كلمة مرور ${user.username}` : 'إضافة مشرف جديد'}</h3><form onSubmit={handleSubmit}><div className="modal-body space-y-4"><div><label>اسم المستخدم:</label><input type="text" value={username} onChange={e => setUsername(e.target.value)} className="form-input" required disabled={!!user}/></div><div><label>كلمة المرور:</label><input type="password" value={password} onChange={e => setPassword(e.target.value)} className="form-input" required/></div></div><div className="modal-footer"><button type="button" onClick={onCancel} className="action-button secondary-action-button">إلغاء</button><button type="submit" className="action-button">حفظ</button></div></form></div></div>;};
+        const UserManagementView = () => { const { appUsersData, saveAppUsers, groups } = useContext(DataContext); const { showToast, showConfirm } = useContext(UIContext); const [isUserModalOpen, setIsUserModalOpen] = useState(false); const [editingUser, setEditingUser] = useState(null); const handleUserSave = (userData) => { const { username, password } = userData; if (editingUser) { const updatedUsers = { ...appUsersData, [editingUser.username]: { ...appUsersData[editingUser.username], password } }; saveAppUsers(updatedUsers); showToast("تم تحديث كلمة المرور."); } else { if (appUsersData[username]) { showToast("اسم المستخدم هذا موجود بالفعل.", true); return; } const newUser = { password, role: "مشرف", permissions: ["manage_students", "record_attendance", "view_records", "view_stats", "manage_competitions", "manage_tests", "perform_draw"] }; saveAppUsers({ ...appUsersData, [username]: newUser }); showToast("تمت إضافة المشرف بنجاح."); } setIsUserModalOpen(false); setEditingUser(null); }; const handleUserDelete = async (username) => { if (username === DEFAULT_ADMIN_USERNAME) { showToast("لا يمكن حذف حساب المسؤول الأساسي.", true); return; } if (groups.some(g => g.supervisorUsername === username)) { showToast(`لا يمكن حذف المشرف ${username} لأنه معين لمجموعة.`, true); return; } if (await showConfirm({ title: 'تأكيد الحذف', message: `هل أنت متأكد من حذف المستخدم ${username}؟` })) { const { [username]: _, ...rest } = appUsersData; saveAppUsers(rest); showToast("تم حذف المستخدم."); } }; return <section className="p-4 md:p-6 bg-white rounded-lg shadow-sm"><h2 className="text-2xl font-bold text-gray-800 mb-6">إدارة المستخدمين</h2><button onClick={() => { setEditingUser(null); setIsUserModalOpen(true); }} className="action-button mb-4">إضافة مشرف جديد</button><div className="overflow-x-auto"><table className="min-w-full text-sm"><thead><tr><th>اسم المستخدم</th><th>الدور</th><th>إجراءات</th></tr></thead><tbody>{Object.entries(appUsersData).map(([username, user]) => <tr key={username}><td>{username}</td><td>{user.role}</td><td>{username !== DEFAULT_ADMIN_USERNAME ? <><button onClick={() => { setEditingUser({ username }); setIsUserModalOpen(true); }} className="action-button edit-button text-xs px-2 py-1 mr-1">تغيير كلمة المرور</button><button onClick={() => handleUserDelete(username)} className="action-button delete-button text-xs px-2 py-1">حذف</button></> : '(الحساب الأساسي)'}</td></tr>)}</tbody></table></div>{isUserModalOpen && <UserModal user={editingUser} onSave={handleUserSave} onCancel={() => setIsUserModalOpen(false)} />}</section>; };
+        const CompetitionModal = ({ entry, students, onSave, onCancel }) => { const { showToast } = useContext(UIContext); const [formData, setFormData] = useState({ studentId: entry?.studentId || '', competitionName: entry?.competitionName || '', juzCount: entry?.juzCount || '' }); const handleSubmit = (e) => { e.preventDefault(); const student = students.find(s => s.id === formData.studentId); if (!student) { showToast("الرجاء اختيار طالب صالح", true); return; } if(!formData.competitionName.trim() || !formData.juzCount) { showToast("الرجاء ملء جميع الحقول", true); return; } onSave({ ...formData, studentName: student.name }); }; return <div className="modal-overlay"><div className="modal-content"><h3 className="modal-header text-xl font-semibold">{entry ? 'تعديل تسجيل' : 'تسجيل طالب في مسابقة'}</h3><form onSubmit={handleSubmit}><div className="modal-body space-y-4"><div><label>الطالب:</label><select value={formData.studentId} onChange={e => setFormData(p => ({...p, studentId: e.target.value}))} className="form-select" required><option value="">-- اختر الطالب --</option>{students.map(s => <option key={s.id} value={s.id}>{s.name} ({s.id})</option>)}</select></div><div><label>اسم المسابقة:</label><input type="text" value={formData.competitionName} onChange={e => setFormData(p => ({...p, competitionName: e.target.value}))} className="form-input" required /></div><div><label>عدد الأجزاء (1-30):</label><input type="number" min="1" max="30" value={formData.juzCount} onChange={e => setFormData(p => ({...p, juzCount: e.target.value}))} className="form-input" required /></div></div><div className="modal-footer"><button type="button" onClick={onCancel} className="action-button secondary-action-button">إلغاء</button><button type="submit" className="action-button">حفظ</button></div></form></div></div>; };
+        const QuranCompetitionsView = () => { const { quranCompetitions, saveQuranCompetitions, students } = useContext(DataContext); const { showToast, showConfirm } = useContext(UIContext); const [isModalOpen, setIsModalOpen] = useState(false); const [editingEntry, setEditingEntry] = useState(null); const handleSave = (entryData) => { if (editingEntry) { saveQuranCompetitions(quranCompetitions.map(c => c.id === editingEntry.id ? {...entryData, id: editingEntry.id} : c)); showToast("تم تحديث تسجيل المسابقة."); } else { saveQuranCompetitions([...quranCompetitions, { ...entryData, id: `comp-${Date.now()}`, registrationDate: getFormattedDate() }]); showToast("تم تسجيل الطالب في المسابقة."); } setIsModalOpen(false); }; const handleDelete = async (entryId) => { if (await showConfirm({ title: 'تأكيد الحذف', message: 'هل أنت متأكد من حذف هذا التسجيل؟' })) { saveQuranCompetitions(quranCompetitions.filter(c => c.id !== entryId)); showToast("تم حذف التسجيل."); } }; return <section className="p-4 md:p-6 bg-white rounded-lg shadow-sm"><h2 className="text-2xl font-bold text-gray-800 mb-6">المسابقات القرآنية</h2><button onClick={() => { setEditingEntry(null); setIsModalOpen(true); }} className="action-button mb-4">تسجيل طالب في مسابقة</button>{isModalOpen && <CompetitionModal entry={editingEntry} students={students} onSave={handleSave} onCancel={() => setIsModalOpen(false)} />}{quranCompetitions.length > 0 ? <div className="overflow-x-auto"><table className="min-w-full text-sm"><thead><tr><th>اسم الطالب</th><th>اسم المسابقة</th><th>عدد الأجزاء</th><th>تاريخ التسجيل</th><th>إجراءات</th></tr></thead><tbody>{quranCompetitions.map(entry => { const student = students.find(s => s.id === entry.studentId); return <tr key={entry.id}><td>{student?.name || entry.studentName || 'طالب محذوف'}</td><td>{entry.competitionName}</td><td>{entry.juzCount}</td><td>{getFormattedDateWithDay(entry.registrationDate)}</td><td><button onClick={() => { setEditingEntry(entry); setIsModalOpen(true); }} className="action-button edit-button text-xs px-2 py-1 mr-1">تعديل</button><button onClick={() => handleDelete(entry.id)} className="action-button delete-button text-xs px-2 py-1">حذف</button></td></tr>})}</tbody></table></div> : <p className="text-center py-8 text-neutral-500">لا يوجد طلاب مسجلون في مسابقات حاليًا.</p>}</section>; };
+        const TestModal = ({ entry, students, onSave, onCancel }) => { const { showToast } = useContext(UIContext); const [formData, setFormData] = useState({ studentId: entry?.studentId || '', testedPortion: entry?.testedPortion || '', newPortion: entry?.newPortion || '', grade: entry?.grade || '', sheikhName: entry?.sheikhName || '', date: entry?.date || getFormattedDate() }); const handleSubmit = (e) => { e.preventDefault(); const student = students.find(s => s.id === formData.studentId); if (!student || !formData.testedPortion.trim() || !formData.newPortion.trim() || !formData.sheikhName.trim()) { showToast("الرجاء ملء جميع الحقول", true); return; } onSave({ ...formData, studentName: student.name }); }; return <div className="modal-overlay"><div className="modal-content"><h3 className="modal-header text-xl font-semibold">{entry ? 'تعديل اختبار' : 'تسجيل اختبار جديد'}</h3><form onSubmit={handleSubmit}><div className="modal-body space-y-4"><div><label>الطالب:</label><select value={formData.studentId} onChange={e => setFormData(p => ({...p, studentId: e.target.value}))} className="form-select" required><option value="">-- اختر الطالب --</option>{students.map(s => <option key={s.id} value={s.id}>{s.name} ({s.id})</option>)}</select></div><div><label>التسميع الماضي (ما تم اختباره):</label><input type="text" value={formData.testedPortion} onChange={e => setFormData(p => ({...p, testedPortion: e.target.value}))} className="form-input" required /></div><div><label>الحفظ الجديد (المطلوب للمرة القادمة):</label><input type="text" value={formData.newPortion} onChange={e => setFormData(p => ({...p, newPortion: e.target.value}))} className="form-input" required /></div><div><label>الدرجة (/10):</label><input type="number" min="0" max="10" step="0.5" value={formData.grade} onChange={e => setFormData(p => ({...p, grade: e.target.value}))} className="form-input" required /></div><div><label>اسم الشيخ المختبر:</label><input type="text" value={formData.sheikhName} onChange={e => setFormData(p => ({...p, sheikhName: e.target.value}))} className="form-input" required /></div><div><label>تاريخ الاختبار:</label><input type="date" value={formData.date} onChange={e => setFormData(p => ({...p, date: e.target.value}))} className="form-input" required /></div></div><div className="modal-footer"><button type="button" onClick={onCancel} className="action-button secondary-action-button">إلغاء</button><button type="submit" className="action-button">حفظ</button></div></form></div></div>; };
+        const MemorizationTestsView = () => { const { memorizationTests, saveMemorizationTests, students } = useContext(DataContext); const { showToast, showConfirm } = useContext(UIContext); const [isModalOpen, setIsModalOpen] = useState(false); const [editingEntry, setEditingEntry] = useState(null); const handleSave = (entryData) => { if (editingEntry) { saveMemorizationTests(memorizationTests.map(t => t.id === editingEntry.id ? {...entryData, id: editingEntry.id} : t)); showToast("تم تحديث سجل الاختبار."); } else { saveMemorizationTests([...memorizationTests, { ...entryData, id: `test-${Date.now()}` }]); showToast("تم تسجيل الاختبار بنجاح."); } setIsModalOpen(false); }; const handleDelete = async (entryId) => { if (await showConfirm({ title: 'تأكيد الحذف', message: 'هل أنت متأكد من حذف سجل هذا الاختبار؟' })) { saveMemorizationTests(memorizationTests.filter(t => t.id !== entryId)); showToast("تم حذف سجل الاختبار."); } }; return <section className="p-4 md:p-6 bg-white rounded-lg shadow-sm"><h2 className="text-2xl font-bold text-gray-800 mb-6">اختبارات تحفيظ القرآن</h2><button onClick={() => { setEditingEntry(null); setIsModalOpen(true); }} className="action-button mb-4">تسجيل اختبار جديد</button>{isModalOpen && <TestModal entry={editingEntry} students={students} onSave={handleSave} onCancel={() => setIsModalOpen(false)} />}{memorizationTests.length > 0 ? <div className="overflow-x-auto"><table className="min-w-full text-sm"><thead><tr><th>التاريخ</th><th>الطالب</th><th>التسميع الماضي</th><th>الحفظ الجديد</th><th>الدرجة</th><th>الشيخ</th><th>إجراءات</th></tr></thead><tbody>{memorizationTests.sort((a,b) => new Date(b.date) - new Date(a.date)).map(entry => <tr key={entry.id}><td>{getFormattedDateWithDay(entry.date)}</td><td>{entry.studentName}</td><td>{entry.testedPortion}</td><td>{entry.newPortion || '-'}</td><td>{entry.grade}</td><td>{entry.sheikhName}</td><td><button onClick={() => {setEditingEntry(entry); setIsModalOpen(true);}} className="action-button edit-button text-xs px-2 py-1 mr-1">تعديل</button><button onClick={() => handleDelete(entry.id)} className="action-button delete-button text-xs px-2 py-1">حذف</button></td></tr>)}</tbody></table></div> : <p className="text-center py-8 text-neutral-500">لا توجد اختبارات مسجلة حاليًا.</p>}</section>; };
+        const RandomRewardDrawView = () => { const { attendanceRecords } = useContext(DataContext); const { showToast } = useContext(UIContext); const [winner, setWinner] = useState(null); const [status, setStatus] = useState(''); const [isDrawing, setIsDrawing] = useState(false); const handleDraw = () => { const todayDateStr = getFormattedDate(); const attendedToday = attendanceRecords[todayDateStr] || []; if (attendedToday.length === 0) { setStatus("لا يوجد طلاب حاضرون اليوم لإجراء السحب."); return; } setIsDrawing(true); setStatus("جارٍ السحب..."); setWinner(null); const interval = setInterval(() => { const randomIndex = Math.floor(Math.random() * attendedToday.length); setStatus(attendedToday[randomIndex].name); }, 100); setTimeout(() => { clearInterval(interval); const winnerIndex = Math.floor(Math.random() * attendedToday.length); const finalWinner = attendedToday[winnerIndex]; setWinner(finalWinner); setStatus(`الطالب الفائز هو: ${finalWinner.name}!`); showToast(`مبروك لـ ${finalWinner.name}!`); setIsDrawing(false); }, 2000); }; return <section className="p-4 md:p-6 bg-white rounded-lg shadow-sm text-center"><h2 className="text-2xl font-bold text-gray-800 mb-6">سحب عشوائي للمكافآت</h2><p className="mb-4 text-gray-600">سيتم اختيار طالب بشكل عشوائي من قائمة الحضور لليوم الحالي.</p><button onClick={handleDraw} disabled={isDrawing} className="action-button text-lg px-6 py-3 disabled:bg-gray-400 disabled:cursor-not-allowed">{isDrawing ? 'جارٍ السحب...' : 'ابدأ السحب!'}</button><div className="mt-6 text-xl font-bold text-teal-600 h-10">{status}</div>{winner && <div className="mt-4 text-3xl font-bold text-green-600 p-4 bg-green-100 rounded-lg animate-pulse">🎉 {winner.name} 🎉</div>}</section>; };
+        const StatsView = () => { const { students, attendanceRecords, groups, systemSettings } = useContext(DataContext); const [filters, setFilters] = useState({ month: new Date().getMonth() + 1, year: new Date().getFullYear(), groupId: 'all', low: 50, regular: 80 }); const [statsData, setStatsData] = useState(null); const handleGenerate = () => { const { month, year, groupId, low, regular } = filters; const daysInMonth = new Date(year, month, 0).getDate(); const monthStr = String(month).padStart(2, '0'); const schoolDaysInMonth = new Set(); for (let day = 1; day <= daysInMonth; day++) { const dateStr = `${year}-${monthStr}-${String(day).padStart(2, '0')}`; const dayOfWeek = new Date(dateStr + "T00:00:00").getDay(); if (systemSettings.dayActivities[dayOfWeek]) schoolDaysInMonth.add(dateStr); } if (schoolDaysInMonth.size === 0) { setStatsData({ error: "لا توجد أيام دراسية محددة في الإعدادات لهذا الشهر." }); return; } let studentsForStats = students; if (groupId !== 'all') { studentsForStats = students.filter(s => s.groupId === (groupId === 'none' ? '' : groupId) || (groupId === 'none' && !s.groupId)); } if (studentsForStats.length === 0) { setStatsData({ error: "لا يوجد طلاب في المجموعة المحددة." }); return; } const calculatedStats = studentsForStats.map(student => { const daysAttended = [...schoolDaysInMonth].filter(date => attendanceRecords[date]?.some(rec => rec.id === student.id)).length; const attendancePercentage = schoolDaysInMonth.size > 0 ? (daysAttended / schoolDaysInMonth.size) * 100 : 0; let status = "عادي"; if (attendancePercentage >= regular) status = "منتظم"; else if (attendancePercentage < low) status = "غير ملتزم"; return { ...student, daysAttended, attendancePercentage, totalSchoolDays: schoolDaysInMonth.size, status }; }); const totalPercentage = calculatedStats.reduce((acc, curr) => acc + curr.attendancePercentage, 0); const averageAttendance = calculatedStats.length > 0 ? totalPercentage / calculatedStats.length : 0; const summary = { totalStudents: calculatedStats.length, averageAttendance: averageAttendance.toFixed(1) + '%', regularCount: calculatedStats.filter(s => s.status === 'منتظم').length, irregularCount: calculatedStats.filter(s => s.status === 'غير ملتزم').length }; setStatsData({ summary: summary, students: calculatedStats.sort((a,b) => b.attendancePercentage - a.attendancePercentage), error: null }); }; const StatCard = ({ title, value, icon }) => <div className="bg-white p-4 rounded-lg shadow-sm flex items-center gap-4"><div className="bg-teal-100 text-teal-600 rounded-full p-3">{icon}</div><div><p className="text-sm text-gray-500">{title}</p><p className="text-2xl font-bold text-gray-800">{value}</p></div></div>; return <section className="p-4 md:p-6 bg-white rounded-lg shadow-sm"><h2 className="text-2xl font-bold text-gray-800 mb-6">إحصائيات الحضور الشهرية</h2><div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 p-4 border rounded-lg bg-gray-50"><div><label>الشهر:</label><select value={filters.month} onChange={e => setFilters(f => ({...f, month: e.target.value}))} className="form-select">{["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"].map((m, i) => <option key={i} value={i+1}>{m}</option>)}</select></div><div><label>السنة:</label><input type="number" value={filters.year} onChange={e => setFilters(f => ({...f, year: e.target.value}))} className="form-input"/></div><div><label>المجموعة:</label><select value={filters.groupId} onChange={e => setFilters(f => ({...f, groupId: e.target.value}))} className="form-select"><option value="all">الكل</option><option value="none">بدون مجموعة</option>{groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select></div><div className="md:col-span-2 lg:col-span-4"><button onClick={handleGenerate} className="action-button w-full justify-center">عرض الإحصائيات</button></div></div>{statsData && (statsData.error ? <p className="text-red-500 text-center py-8">{statsData.error}</p> : <div className="space-y-8"><div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"><StatCard title="إجمالي الطلاب" value={statsData.summary.totalStudents} icon={<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>} /><StatCard title="متوسط الحضور" value={statsData.summary.averageAttendance} icon={<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" x2="12" y1="20" y2="10"/><path d="M18 20V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16"/><path d="M6 20h12"/></svg>} /><StatCard title="المنتظمون" value={statsData.summary.regularCount} icon={<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>} /><StatCard title="غير الملتزمين" value={statsData.summary.irregularCount} icon={<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" x2="9" y1="9" y2="15"/><line x1="9" x2="15" y1="9" y2="15"/></svg>} /></div><div><h3 className="text-xl font-semibold text-gray-700 mb-4">مخطط نسبة الحضور للطلاب</h3><div className="space-y-3 p-4 border rounded-lg bg-gray-50">{statsData.students.map(student => <div key={student.id} className="grid grid-cols-4 gap-4 items-center text-sm"><span className="col-span-1 truncate font-medium">{student.name}</span><div className="col-span-3 bg-gray-200 rounded-full h-6"><div className="bg-teal-500 h-6 rounded-full text-white text-xs flex items-center justify-center" style={{ width: `${student.attendancePercentage}%` }}>{student.attendancePercentage.toFixed(1)}%</div></div></div>)}</div></div></div>)}</section>; };
+        
+        // --- Main App Component ---
+        function App() {
+            const { loggedInUser, hasPermission } = useContext(AuthContext);
+            const { isDataLoaded } = useContext(DataContext);
+            const { confirmModal } = useContext(UIContext);
+            const [currentView, setCurrentView] = useState('introView');
+            
+            useEffect(() => {
+                if (loggedInUser && isDataLoaded) {
+                    const navItems = ["introView", "studentsView", "attendanceView", "recordsView", "quranCompetitionsView", "memorizationTestsView", "randomRewardDrawView", "statsView", "settingsView", "userManagementView", "accountView", "dataManagementView"];
+                    const firstAllowedView = navItems.find(view => hasPermission(view));
+                    setCurrentView(firstAllowedView || 'introView');
+                }
+            }, [loggedInUser, isDataLoaded, hasPermission]);
+
+            if (!isDataLoaded) return <div className="flex items-center justify-center min-h-screen">جارٍ تحميل البيانات...</div>;
+            if (!loggedInUser) return <LoginView />;
+            
+            const renderView = () => {
+                const views = { introView: <IntroView/>, studentsView: <StudentsView/>, attendanceView: <AttendanceView/>, recordsView: <RecordsView/>, quranCompetitionsView: <QuranCompetitionsView/>, memorizationTestsView: <MemorizationTestsView/>, randomRewardDrawView: <RandomRewardDrawView/>, statsView: <StatsView/>, settingsView: <SettingsView/>, userManagementView: <UserManagementView/>, accountView: <AccountView/>, dataManagementView: <DataManagementView/> };
+                return views[currentView] || <IntroView/>;
+            };
+            
+            return (
+                <div className="container mx-auto p-4 md:p-6">
+                    {confirmModal.show && <ConfirmModal {...confirmModal} />}
+                    <Header />
+                    <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                        <Nav currentView={currentView} setCurrentView={setCurrentView} />
+                        <main className="md:col-span-3 lg:col-span-4">{renderView()}</main>
+                    </div>
+                    <footer className="text-center mt-10 pt-6 border-t border-gray-200"><p className="text-sm text-gray-500">&copy; {new Date().getFullYear()} khaled ahmed (React Version)</p></footer>
+                </div>
+            );
+        }
+        
+        // --- Render the App ---
+        const AppWrapper = () => (
+            <UIProvider>
+                <DataProvider>
+                    <AuthProvider>
+                        <App />
+                    </AuthProvider>
+                </DataProvider>
+            </UIProvider>
+        );
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<AppWrapper />);
+
+    </script>
+</body>
+</html>
