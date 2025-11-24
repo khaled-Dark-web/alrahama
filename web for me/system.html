@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة القيادة | مسجد الرحمة</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+
+    <style>
+        :root { --primary-dark: #02242b; --primary-light: #0e5e6f; --accent: #a78a5a; }
+        body { 
+            font-family: 'Tajawal', sans-serif; 
+            background-color: var(--primary-dark);
+            background-image: radial-gradient(circle at 50% 0%, var(--primary-light) 0%, var(--primary-dark) 70%);
+            color: #f1f5f9; min-height: 100vh; overflow-x: hidden;
+            position: relative;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.05); box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        }
+        .glass-sidebar {
+            background: rgba(2, 36, 43, 0.85); backdrop-filter: blur(20px);
+            border-left: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        /* Stars Animation Fix */
+        .particle {
+            position: absolute;
+            top: 0; /* تم التثبيت في الأعلى لتعمل حركة translateY بشكل صحيح */
+            border-radius: 50%;
+            background: white;
+            box-shadow: 0 0 4px 1px rgba(255, 255, 255, 0.4); /* توهج أوضح */
+            pointer-events: none;
+            z-index: 0;
+            opacity: 0;
+        }
+        
+        @keyframes floatUp {
+            0% {
+                transform: translateY(100vh) rotate(0deg);
+                opacity: 0;
+            }
+            10% {
+                opacity: 0.8;
+            }
+            90% {
+                opacity: 0.8;
+            }
+            100% {
+                transform: translateY(-10vh) rotate(360deg); /* تخرج من أعلى الشاشة */
+                opacity: 0;
+            }
+        }
+
+        .fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* Mobile Transitions */
+        .sidebar-enter { transform: translateX(100%); }
+        .sidebar-enter-active { transform: translateX(0); transition: transform 0.3s ease-out; }
+        .sidebar-exit { transform: translateX(0); }
+        .sidebar-exit-active { transform: translateX(100%); transition: transform 0.3s ease-in; }
+    </style>
+</head>
+<body class="antialiased text-slate-200">
+    <!-- Star Background Container -->
+    <div id="stars-bg" class="fixed inset-0 w-full h-full pointer-events-none z-0 overflow-hidden"></div>
+    
+    <div id="root" class="relative z-10 h-screen flex overflow-hidden"></div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const container = document.getElementById('stars-bg');
+            if (!container) return;
+
+            const starCount = 150; // زيادة عدد النجوم
+
+            for (let i = 0; i < starCount; i++) {
+                const star = document.createElement('div');
+                star.classList.add('particle');
+                
+                // حجم عشوائي
+                const size = Math.random() * 2.5 + 1; 
+                
+                // موقع أفقي عشوائي
+                const left = Math.random() * 100;
+                
+                // مدة حركة عشوائية (بين 15 و 45 ثانية)
+                const duration = Math.random() * 30 + 15;
+                
+                // تأخير سلبي لملء الشاشة فوراً (كأن الحركة بدأت من قبل)
+                const delay = -(Math.random() * duration);
+
+                star.style.cssText = `
+                    width: ${size}px; 
+                    height: ${size}px; 
+                    left: ${left}%; 
+                    animation: floatUp ${duration}s linear infinite;
+                    animation-delay: ${delay}s;
+                `;
+                
+                container.appendChild(star);
+            }
+        });
+    </script>
+    <script type="text/babel">
+        const { useState, useEffect, createContext, useContext, useRef } = React;
+
+        const LS_KEYS = { USERS: 'mosque_users_v2', STUDENTS: 'mosque_students_v2', ATTENDANCE: 'mosque_attendance_v2', GROUPS: 'mosque_groups_v2', SETTINGS: 'mosque_settings_v2' };
+        const DataContext = createContext(); const AuthContext = createContext();
+
+        const DataProvider = ({ children }) => {
+            const [data, setData] = useState({ students: [], attendance: {}, groups: [], settings: { dayActivities: {} } });
+            const [loaded, setLoaded] = useState(false);
+            useEffect(() => {
+                const load = (key, def) => { try { return JSON.parse(localStorage.getItem(key)) || def; } catch { return def; } };
+                setData({
+                    students: load(LS_KEYS.STUDENTS, []), attendance: load(LS_KEYS.ATTENDANCE, {}),
+                    groups: load(LS_KEYS.GROUPS, [{id: 'g1', name: 'حلقة أبو بكر', supervisor: 'الشيخ أحمد'}, {id: 'g2', name: 'حلقة عمر', supervisor: 'الشيخ محمد'}]),
+                    settings: load(LS_KEYS.SETTINGS, { dayActivities: {} })
+                });
+                setLoaded(true);
+            }, []);
+            const save = (key, newData) => {
+                localStorage.setItem(key, JSON.stringify(newData));
+                const stateKey = Object.keys(LS_KEYS).find(k => LS_KEYS[k] === key)?.toLowerCase();
+                if(stateKey) setData(prev => ({ ...prev, [stateKey]: newData }));
+            };
+            const addStudent = (student) => { const updated = [...data.students, { ...student, id: Date.now().toString() }]; save(LS_KEYS.STUDENTS, updated); };
+            const recordAttendance = (studentId) => {
+                const today = new Date().toISOString().split('T')[0];
+                const student = data.students.find(s => s.id === studentId);
+                if (!student) return false;
+                const currentRecords = data.attendance[today] || [];
+                if (currentRecords.find(r => r.id === studentId)) return 'exist';
+                const newRecord = { id: studentId, name: student.name, group: student.group || 'عام', time: new Date().toLocaleTimeString('ar-EG') };
+                save(LS_KEYS.ATTENDANCE, { ...data.attendance, [today]: [...currentRecords, newRecord] });
+                return true;
+            };
+            return <DataContext.Provider value={{ data, loaded, addStudent, recordAttendance }}>{children}</DataContext.Provider>;
+        };
+
+        const AuthProvider = ({ children }) => {
+            const [user, setUser] = useState(null);
+            const login = (u, p) => { if (u === 'admin' && p === 'admin') { setUser({ name: 'المسؤول العام', role: 'admin' }); return true; } return false; };
+            return <AuthContext.Provider value={{ user, login, logout: () => setUser(null) }}>{children}</AuthContext.Provider>;
+        };
+
+        // --- COMPONENTS ---
+        const Sidebar = ({ activeView, setView, isMobileOpen, closeMobile }) => {
+            const menuItems = [
+                { id: 'dashboard', label: 'لوحة القيادة', icon: 'dashboard' },
+                { id: 'students', label: 'الطلاب', icon: 'people' },
+                { id: 'attendance', label: 'الحضور', icon: 'qr_code_scanner' },
+                { id: 'groups', label: 'المجموعات', icon: 'groups' },
+                { id: 'settings', label: 'الإعدادات', icon: 'settings' },
+            ];
+            
+            // Responsive Sidebar Classes
+            const baseClasses = "flex flex-col w-64 glass-sidebar h-full text-slate-300 transition-transform duration-300 z-50";
+            const mobileClasses = isMobileOpen ? "fixed top-0 right-0 translate-x-0 shadow-2xl" : "fixed top-0 right-0 translate-x-full";
+            const desktopClasses = "hidden md:flex relative translate-x-0";
+
+            return (
+                <>
+                    {/* Backdrop for Mobile */}
+                    {isMobileOpen && <div className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm" onClick={closeMobile}></div>}
+                    
+                    <aside className={`${baseClasses} ${desktopClasses} ${mobileClasses} md:!translate-x-0`}>
+                        <div className="p-6 flex items-center justify-between border-b border-white/10">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg">
+                                    <span className="material-icons-round text-white">mosque</span>
+                                </div>
+                                <div><h1 className="font-bold text-white text-lg">مسجد الرحمة</h1><p className="text-xs text-slate-400">نظام الإدارة</p></div>
+                            </div>
+                            <button className="md:hidden text-slate-400" onClick={closeMobile}><span className="material-icons-round">close</span></button>
+                        </div>
+
+                        <nav className="flex-1 py-6 px-3 space-y-1 overflow-y-auto">
+                            {menuItems.map(item => (
+                                <button key={item.id} onClick={() => { setView(item.id); closeMobile(); }}
+                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${activeView === item.id ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 shadow-[0_0_15px_rgba(6,182,212,0.1)]' : 'hover:bg-white/5 text-slate-400 hover:text-white'}`}>
+                                    <span className="material-icons-round">{item.icon}</span><span className="font-medium">{item.label}</span>
+                                </button>
+                            ))}
+                        </nav>
+
+                        <div className="p-4 border-t border-white/10">
+                            <div className="glass-panel p-4 rounded-xl flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center">A</div>
+                                <div className="flex-1 min-w-0"><p className="text-sm font-bold text-white truncate">المسؤول</p></div>
+                                <button className="text-slate-400 hover:text-rose-400"><span className="material-icons-round">logout</span></button>
+                            </div>
+                        </div>
+                    </aside>
+                </>
+            );
+        };
+
+        const Dashboard = ({ toggleSidebar }) => {
+            const { data } = useContext(DataContext);
+            const chartRef = useRef(null);
+            const today = new Date().toISOString().split('T')[0];
+            
+            useEffect(() => {
+                if (chartRef.current) {
+                    new Chart(chartRef.current.getContext('2d'), {
+                        type: 'bar',
+                        data: {
+                            labels: ['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'],
+                            datasets: [{ label: 'الحضور', data: [12, 19, 3, 5, 2, 3, 10], backgroundColor: 'rgba(6, 182, 212, 0.6)', borderRadius: 4 }]
+                        },
+                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { grid: { color: 'rgba(255,255,255,0.05)' } } } }
+                    });
+                }
+            }, []);
+
+            const StatCard = ({ title, value, icon, color }) => (
+                <div className="glass-panel p-5 rounded-2xl flex items-start justify-between">
+                    <div><p className="text-slate-400 text-sm mb-1">{title}</p><h3 className="text-2xl font-bold text-white">{value}</h3></div>
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${color}`}><span className="material-icons-round text-white">{icon}</span></div>
+                </div>
+            );
+
+            return (
+                <div className="p-4 md:p-8 overflow-y-auto h-full fade-in w-full">
+                    {/* Header with Mobile Toggle */}
+                    <header className="flex justify-between items-center mb-6">
+                        <div className="flex items-center gap-3">
+                            <button onClick={toggleSidebar} className="md:hidden glass-panel w-10 h-10 rounded-xl flex items-center justify-center text-white"><span className="material-icons-round">menu</span></button>
+                            <div><h2 className="text-xl md:text-2xl font-bold text-white">لوحة القيادة</h2><p className="text-slate-400 text-xs md:text-sm mt-1">نظرة عامة</p></div>
+                        </div>
+                        <div className="flex gap-2">
+                             <button className="glass-panel w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/10 text-slate-300 relative"><span className="material-icons-round">notifications</span><span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full"></span></button>
+                        </div>
+                    </header>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                        <StatCard title="الطلاب" value={data.students.length} icon="school" color="bg-cyan-600" />
+                        <StatCard title="الحضور" value={(data.attendance[today] || []).length} icon="co_present" color="bg-emerald-600" />
+                        <StatCard title="المجموعات" value={data.groups.length} icon="groups" color="bg-amber-600" />
+                        <StatCard title="المشرفين" value="4" icon="supervisor_account" color="bg-indigo-600" />
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                        <div className="lg:col-span-2 glass-panel p-4 md:p-6 rounded-2xl h-64"><canvas ref={chartRef}></canvas></div>
+                        <div className="glass-panel p-4 md:p-6 rounded-2xl h-64 flex flex-col justify-center items-center text-center">
+                            <h3 className="text-white font-bold mb-2">حالة النظام</h3>
+                            <div className="w-24 h-24 rounded-full border-4 border-emerald-500 flex items-center justify-center mb-2"><span className="text-emerald-400 font-bold">100%</span></div>
+                            <p className="text-xs text-slate-400">جميع الأنظمة تعمل بكفاءة</p>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const AttendanceScanner = ({ toggleSidebar }) => {
+             const { recordAttendance } = useContext(DataContext);
+             const [scanResult, setScanResult] = useState(null);
+             useEffect(() => {
+                const scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
+                scanner.render((txt) => {
+                    const res = recordAttendance(txt);
+                    setScanResult(res === true ? { type: 'success', msg: 'تم التسجيل' } : res === 'exist' ? { type: 'warning', msg: 'مسجل مسبقاً' } : { type: 'error', msg: 'غير موجود' });
+                    scanner.clear();
+                }, () => {});
+                return () => scanner.clear().catch(()=>{});
+            }, []);
+
+            return (
+                <div className="p-4 h-full flex flex-col items-center justify-center fade-in">
+                    <button onClick={toggleSidebar} className="absolute top-4 right-4 md:hidden glass-panel w-10 h-10 rounded-xl flex items-center justify-center text-white"><span className="material-icons-round">menu</span></button>
+                    <div className="glass-panel p-6 rounded-3xl w-full max-w-sm text-center">
+                        <h2 className="text-xl font-bold text-white mb-4">مسح الرمز</h2>
+                        <div id="reader" className="bg-black/50 rounded-xl overflow-hidden mb-4 border border-white/10"></div>
+                        {scanResult && <div className={`p-3 rounded-xl mb-4 text-sm ${scanResult.type === 'success' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}`}>{scanResult.msg}</div>}
+                        <button onClick={() => window.location.reload()} className="text-xs text-slate-400 underline">إعادة تحميل</button>
+                    </div>
+                </div>
+            );
+        };
+
+        const App = () => {
+            const [view, setView] = useState('dashboard');
+            const [sidebarOpen, setSidebarOpen] = useState(false);
+            const { loaded } = useContext(DataContext);
+            const { user } = useContext(AuthContext);
+
+            if (!loaded) return <div className="h-screen flex items-center justify-center text-cyan-400">تحميل...</div>;
+            if (!user) return <LoginScreen />;
+
+            return (
+                <div className="flex h-screen w-full relative z-10">
+                    <Sidebar activeView={view} setView={setView} isMobileOpen={sidebarOpen} closeMobile={() => setSidebarOpen(false)} />
+                    <main className="flex-1 overflow-hidden relative w-full">
+                        {view === 'dashboard' && <Dashboard toggleSidebar={() => setSidebarOpen(true)} />}
+                        {view === 'attendance' && <AttendanceScanner toggleSidebar={() => setSidebarOpen(true)} />}
+                        {view === 'students' && <div className="p-10 text-center text-slate-500 fade-in">
+                             <button onClick={() => setSidebarOpen(true)} className="md:hidden absolute top-4 right-4 glass-panel w-10 h-10 rounded-xl flex items-center justify-center text-white"><span className="material-icons-round">menu</span></button>
+                             صفحة الطلاب (قيد التطوير)
+                        </div>}
+                    </main>
+                </div>
+            );
+        };
+
+        const LoginScreen = () => {
+            const { login } = useContext(AuthContext);
+            const [u, setU] = useState(''); const [p, setP] = useState('');
+            return (
+                <div className="h-screen w-full flex items-center justify-center px-4 relative z-20">
+                    <div className="glass-panel p-8 rounded-3xl w-full max-w-sm shadow-2xl relative overflow-hidden">
+                        <div className="text-center mb-6"><h1 className="text-2xl font-bold text-white">دخول النظام</h1><p className="text-slate-400 text-sm">admin / admin</p></div>
+                        <form onSubmit={e => { e.preventDefault(); login(u, p); }} className="space-y-4">
+                            <input type="text" value={u} onChange={e => setU(e.target.value)} className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-cyan-500" placeholder="اسم المستخدم" />
+                            <input type="password" value={p} onChange={e => setP(e.target.value)} className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-cyan-500" placeholder="كلمة المرور" />
+                            <button className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3 rounded-xl shadow-lg transition">دخول</button>
+                        </form>
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<DataProvider><AuthProvider><App /></AuthProvider></DataProvider>);
+    </script>
+</body>
+</html>
